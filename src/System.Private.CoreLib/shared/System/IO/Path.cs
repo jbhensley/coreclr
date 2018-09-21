@@ -416,6 +416,23 @@ namespace System.IO
             return JoinInternal(path1, path2, path3);
         }
 
+        public static string Join(ReadOnlySpan<char> path1, ReadOnlySpan<char> path2, ReadOnlySpan<char> path3, ReadOnlySpan<char> path4)
+        {
+            if (path1.Length == 0)
+                return Join(path2, path3, path4);
+
+            if (path2.Length == 0)
+                return Join(path1, path3, path4);
+
+            if (path3.Length == 0)
+                return Join(path1, path2, path4);
+
+            if (path4.Length == 0)
+                return Join(path1, path2, path3);
+
+            return JoinInternal(path1, path2, path3, path4);
+        }
+
         public static string Join(string path1, string path2)
         {
             return Join(path1.AsSpan(), path2.AsSpan());
@@ -424,6 +441,11 @@ namespace System.IO
         public static string Join(string path1, string path2, string path3)
         {
             return Join(path1.AsSpan(), path2.AsSpan(), path3.AsSpan());
+        }
+
+        public static string Join(string path1, string path2, string path3, string path4)
+        {
+            return Join(path1.AsSpan(), path2.AsSpan(), path3.AsSpan(), path4.AsSpan());
         }
 
         public static bool TryJoin(ReadOnlySpan<char> path1, ReadOnlySpan<char> path2, Span<char> destination, out int charsWritten)
@@ -490,6 +512,44 @@ namespace System.IO
 
             path3.CopyTo(destination.Slice(charsWritten));
             charsWritten += path3.Length;
+
+            return true;
+        }
+
+        public static bool TryJoin(ReadOnlySpan<char> path1, ReadOnlySpan<char> path2, ReadOnlySpan<char> path3, ReadOnlySpan<char> path4, Span<char> destination, out int charsWritten)
+        {
+            charsWritten = 0;
+            if (path1.Length == 0 && path2.Length == 0 && path3.Length == 0 && path4.Length == 0)
+                return true;
+
+            if (path1.Length == 0)
+                return TryJoin(path2, path3, path4, destination, out charsWritten);
+            if (path2.Length == 0)
+                return TryJoin(path1, path3, path4, destination, out charsWritten);
+            if (path3.Length == 0)
+                return TryJoin(path1, path2, path4, destination, out charsWritten);
+            if (path4.Length == 0)
+                return TryJoin(path1, path2, path3, destination, out charsWritten);
+
+            int neededSeparators = PathInternal.EndsInDirectorySeparator(path1) || PathInternal.StartsWithDirectorySeparator(path2) ? 0 : 1;
+            neededSeparators += PathInternal.EndsInDirectorySeparator(path2) || PathInternal.StartsWithDirectorySeparator(path3) ? 0 : 1;
+
+            bool needsThirdSeparator = !(PathInternal.EndsInDirectorySeparator(path3) || PathInternal.StartsWithDirectorySeparator(path4));
+            if (needsThirdSeparator)
+                neededSeparators++;
+            
+            int charsNeeded = path1.Length + path2.Length + path3.Length + path4.Length + neededSeparators;
+            if (destination.Length < charsNeeded)
+                return false;
+
+            bool result = TryJoin(path1, path2, path3, destination, out charsWritten);
+            Debug.Assert(result, "should never fail joining first three paths");
+
+            if (needsThirdSeparator)
+                destination[charsWritten++] = DirectorySeparatorChar;
+
+            path4.CopyTo(destination.Slice(charsWritten));
+            charsWritten += path4.Length;
 
             return true;
         }
